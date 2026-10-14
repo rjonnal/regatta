@@ -66,7 +66,7 @@ class ReferenceVolume:
 class RegisteredVolumeSeries:
 
     def __init__(self,reference_data):
-        self.volumes = []
+        self.volume_folders = []
         self.xshifts = []
         self.yshifts = []
         self.zshifts = []
@@ -75,7 +75,7 @@ class RegisteredVolumeSeries:
         self.ref = ReferenceVolume(reference_data)
         #self.add(reference_data)
         
-    def add(self,volume,x=None,y=None,z=None,xc=None):
+    def add(self,volume_folder,x=None,y=None,z=None,xc=None):
 
         if x is None or y is None or z is None:
             sy,sz,sx = volume.shape
@@ -84,108 +84,15 @@ class RegisteredVolumeSeries:
             z = np.zeros(sy)
             xc = np.ones(sy)*np.inf
             
-        self.volumes.append(volume)
+        self.volume_folders.append(volume_folder)
         self.xshifts.append(x)
         self.yshifts.append(y)
         self.zshifts.append(z)
         self.corrs.append(xc)
 
-
-    def register_volumes(self,target_volumes_list,show_plots=False,error_rms=0):
-
-        for vidx,target_volume in enumerate(target_volumes_list):
-            corr_arr = []
-            y_shift_arr = []
-            z_shift_arr = []
-            x_shift_arr = []
-            for s in range(self.ref.n_slow):
-                tar = target_volume[s,:,:]
-                res = self.ref.register(tar)
-
-                if error_rms:
-                    res['dx'] = res['dx'] + int(np.round(np.random.randn()*error_rms))
-                    res['dy'] = res['dy'] + int(np.round(np.random.randn()*error_rms))
-                    res['dz'] = res['dz'] + int(np.round(np.random.randn()*error_rms))
-                
-                corr_arr.append(res['xc'])
-                x_shift_arr.append(res['dx'])
-                y_shift_arr.append(res['dy']-s)
-                z_shift_arr.append(res['dz'])
-
-            if PLOT_SINGLE_VOLUME_RESULTS:
-                plt.figure()
-                plt.subplot(2,2,1)
-                plt.plot(corr_arr)
-                plt.ylabel('xcorr')
-                plt.subplot(2,2,2)
-                plt.plot(x_shift_arr)
-                plt.ylabel('x shift')
-                plt.subplot(2,2,3)
-                plt.plot(y_shift_arr)
-                plt.ylabel('y shift')
-                plt.subplot(2,2,4)
-                plt.plot(z_shift_arr)
-                plt.ylabel('z shift')
-                plt.show()
-                
-            # filter shifts using xc here, later
-
-            # ideas for filtering the shift vectors
-            # 1. Limit derivative of shift to small amount; motivated
-            #    by intuition that the retina's motion between B-scans
-            #    is small, esp. at 5 kHz in AO-OCT system
-            # 2. Median filtering may remove outliers when they are
-            #    isolated, but will fail when clusters of B-scans are out
-            #    of place, which appears to happen fequently (during saccades,
-            #    for instance)
-            # 3. Motion is a non-Markov process; the previous derivative (velocity)
-            #    is predictive of the current derivative. This is a stronger statement
-            #    than that made in #1 above.
-            # 4. Eye movement processes are reversible; that is "previous" in #3 is
-            #    equivalent to "next".
-
-            corr_arr = np.array(corr_arr)
-            y_shift_arr = np.array(y_shift_arr,dtype=float)
-            z_shift_arr = np.array(z_shift_arr,dtype=float)
-            x_shift_arr = np.array(x_shift_arr,dtype=float)
-            rad_arr = np.sqrt(y_shift_arr**2+z_shift_arr**2+x_shift_arr**2)
-
-
-            cstd = np.std(corr_arr)
-            if cstd>0:
-                ncorr_arr = corr_arr/np.std(corr_arr)
-            else:
-                ncorr_arr = 3.0*np.ones(corr_arr.shape)
-
-            nrad_arr = rad_arr/(np.std(rad_arr)+1)
-
-            ncorr_thresh_std = 1.5
-            nrad_thresh_std = 1.0
-            valid = (ncorr_arr>ncorr_thresh_std)*(nrad_arr<nrad_thresh_std)
-            invalid = 1-valid
-            
-            corr_arr[np.where(invalid)] = np.nan
-            y_shift_arr[np.where(invalid)] = np.nan
-            z_shift_arr[np.where(invalid)] = np.nan
-            x_shift_arr[np.where(invalid)] = np.nan
-
-            if show_plots:
-                plt.cla()
-                plt.plot(ncorr_arr,label='normalized correlation')
-                plt.plot(nrad_arr,label='normalized 3D displacement')
-                for k in range(len(invalid)):
-                    if invalid[k]:
-                        plt.axvline(k,color='r',alpha=0.2)
-                plt.legend()
-                os.makedirs('figures',exist_ok=True)
-                plt.savefig(os.path.join('figures','regdata_%03d.png'%vidx))
-                plt.pause(.1)
-            self.add(target_volume,x_shift_arr,y_shift_arr,z_shift_arr,corr_arr)
-
-        self.correct_volumes()
-        self.average_volume = np.nanmean(np.abs(np.array(self.corrected_volumes)),axis=0)
         
-    def register_volume_folders(self,target_volume_folders_list,show_plots=False,error_rms=0):
+
+    def register_volumes(self,target_volume_folders_list,show_plots=False,error_rms=0):
         all_corrs = []
         for vidx,target_volume_folder in enumerate(target_volume_folders_list):
             target_volume = rfunc.get_volume(target_volume_folder)
@@ -225,7 +132,7 @@ class RegisteredVolumeSeries:
                 plt.ylabel('z shift')
                 plt.show()
             
-
+            
             # filter shifts using xc here, later
 
             # ideas for filtering the shift vectors
@@ -278,27 +185,28 @@ class RegisteredVolumeSeries:
                 os.makedirs('figures',exist_ok=True)
                 plt.savefig(os.path.join('figures','regdata_%03d.png'%vidx))
                 plt.pause(.1)
-            self.add(target_volume,x_shift_arr,y_shift_arr,z_shift_arr,corr_arr)
-
-        self.correct_volumes()
-        self.average_volume = np.nanmean(np.abs(np.array(self.corrected_volumes)),axis=0)
-        
-    def correct_volumes(self):
+            self.add(target_volume_folder,x_shift_arr,y_shift_arr,z_shift_arr,corr_arr)
+            
+    def correct_volumes(self,output_folder,tags):
         # Determine how large the rendered volume must be.
         # 1. Convert shifts lists to arrays
         # 2. Subtract minimum from each shift array
         # 3. Compute maximum value of shift in each dimension,
         #    and add this to the original volume dimensions
 
-        sy, sz, sx = self.volumes[0].shape
-        # refactor: implement paging for large volume series that can't be held in RAM
-        self.corrected_volumes = []
+        test = rfunc.get_volume(self.volume_folders[0])
+        sy, sz, sx = test.shape
+
         
         xshifts_vec = np.array(self.xshifts)
         yshifts_vec = np.array(self.yshifts)
         zshifts_vec = np.array(self.zshifts)
         corrs_vec = np.array(self.corrs)
-        
+
+        for arr in [xshifts_vec, yshifts_vec, zshifts_vec, corrs_vec]:
+            assert arr.shape[0]==len(tags)
+            assert arr.shape[0]==len(self.volume_folders)
+
         # min-subtract all shifts
         yshifts_vec = yshifts_vec - np.nanmin(yshifts_vec)
         zshifts_vec = zshifts_vec - np.nanmin(zshifts_vec)
@@ -309,7 +217,10 @@ class RegisteredVolumeSeries:
         csz = int(sz + np.nanmax(zshifts_vec))
         csx = int(sx + np.nanmax(xshifts_vec))
 
-        for v,ysv,zsv,xsv,cv in zip(self.volumes,yshifts_vec,zshifts_vec,xshifts_vec,corrs_vec):
+        self.corrected_filenames = []
+        
+        for vfn,ysv,zsv,xsv,cv,tag in zip(self.volume_folders,yshifts_vec,zshifts_vec,xshifts_vec,corrs_vec,tags):
+            v = rfunc.get_volume(vfn)
             corrected_volume = np.ones((csy,csz,csx),dtype=complex)*np.nan
             for idx,(bscan,y,z,x,c) in enumerate(zip(v,ysv,zsv,xsv,cv)):
                 if np.isnan(c):
@@ -317,7 +228,31 @@ class RegisteredVolumeSeries:
                 corrected_volume[idx+int(y),int(z):int(z+sz),int(x):int(x+sx)] = bscan
                 
             # refactor: implement paging for large volume series that can't be held in RAM
-            self.corrected_volumes.append(corrected_volume)
+            corrected_vfn = os.path.join(output_folder,'%s.npy'%tag)
+            self.corrected_filenames.append(corrected_vfn)
+            np.save(corrected_vfn,corrected_volume)
+
+
+    def average_volumes(self,magnitude=True,machine_epsilon=1e-16):
+        temp = np.load(self.corrected_filenames[0])
+
+        if magnitude:
+            sum_volume = np.zeros(temp.shape,dtype=float)
+        else:
+            sum_volume = np.zeros(temp.shape,dtype=complex)
+            
+        counter_volume = np.ones(temp.shape,dtype=float)*machine_epsilon
+
+        for cfn in self.corrected_filenames:
+            vol = np.load(cfn)
+            vol[np.where(np.isnan(vol))] = 0.0
+            if magnitude:
+                vol = np.abs(vol)
+            sum_volume = sum_volume+vol
+            counter_volume[np.where(vol)]+=1
+
+        return sum_volume/counter_volume
+
 
 
     def phase_align_volumes(self,show_plots=False):

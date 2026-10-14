@@ -18,7 +18,6 @@ WRITE_REGISTERED_VOLUMES = False
 
 ############## END USER PARAMETERS ##############
 
-
 os.makedirs(manifest.output_folder,exist_ok=True)
 
 # get the reference volume
@@ -26,8 +25,18 @@ ref = rfunc.get_volume(manifest.reference_folder)
 
 # register the series to the reference:
 rvs = registered_volume_series.RegisteredVolumeSeries(ref)
-rvs.register_volume_folders(manifest.volume_folders)
+rvs.register_volumes(manifest.volume_folders)
+rvs.correct_volumes(manifest.output_folder,manifest.tags)
+average_volume = rvs.average_volumes()
 
+while True:
+    for z in range(average_volume.shape[1]):
+        plt.cla()
+        plt.imshow(average_volume[:,z,:],cmap='gray')
+        plt.pause(.001)
+    plt.pause(1)
+
+sys.exit()
 # save the registered average
 np.save(os.path.join(manifest.output_folder,'average_volume.npy'),rvs.average_volume)
 
