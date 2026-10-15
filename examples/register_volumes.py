@@ -4,78 +4,61 @@ from matplotlib import pyplot as plt
 import sys,os,glob
 from regatta import registered_volume_series
 import imageio
-
+import manifest
 
 ################ USER PARAMETERS ################
 
 ## Script switches
-COMPUTE_FIGURES_OF_MERIT = True
+COMPUTE_FIGURES_OF_MERIT = False
 DO_PHASE_CORRECTION = False
 PLOT_CORRELATIONS = False
-PLOT_PROJECTIONS = False
+PLOT_PROJECTIONS = True
 WRITE_PNGS = False
 WRITE_REGISTERED_VOLUMES = False
-
-# data for this test can be downloaded from the link below:
-# https://www.dropbox.com/scl/fo/ys0tmdk79i6tvkbz28ktp/ALx_5UovCD0_5O_yz5HGTHw?rlkey=h1g2u6ocv9i00g1o7k9s5lngh&dl=0
-
-# point 'root_folder' to the location of the data downloaded above
-# provide a folder name for storage of output
-# warning: the script will create the output folder and overwrite any existing
-# contents
-root_folder = '/home/rjonnal/Dropbox/Data/volume_registration/bscans_aooct'
-output_folder = '/home/rjonnal/Dropbox/Data/volume_registration/bscans_aooct_output'
 
 ############## END USER PARAMETERS ##############
 
 
-# root_folder = 'C:/bscans_aooct'
-
-volume_filenames = sorted(glob.glob(os.path.join(root_folder,'*')))
-
-vols = [rfunc.get_volume(fn,prefix='') for fn in volume_filenames]
-
-# use a volume from the middle of the series as a reference:
-refidx = len(vols)//2
-
-output_folder = os.path.join(output_folder,'refidx_%05d'%refidx)
-os.makedirs(output_folder,exist_ok=True)
+os.makedirs(manifest.output_folder,exist_ok=True)
 
 # get the reference volume
-ref = vols[refidx]
-reference_data = ref
+ref = rfunc.get_volume(manifest.reference_volume_filename)
 
 # register the series to the reference:
-rvs = registered_volume_series.RegisteredVolumeSeries(ref)
-rvs.register_volumes(vols)
+rvs = registered_volume_series.RegisteredVolumeSeries(ref,manifest)
+rvs.register_volumes(show_plots=False)
+rvs.correct_volumes()
+sys.exit()
+
 
 # save the registered average
-np.save(os.path.join(output_folder,'average_volume.npy'),rvs.average_volume)
+np.save(os.path.join(manifest.output_folder,'average_volume.npy'),rvs.average_volume)
+
 
 
 if COMPUTE_FIGURES_OF_MERIT:
 
-    print('reference volume entropy: ',rvs.compute_entropy(vols[refidx]))
+    print('reference volume entropy: ',rvs.compute_entropy(ref))
     print('unregistered average entropy: ',rvs.compute_entropy(np.mean(np.array(vols),axis=0)))
     print('registered average entropy: ',rvs.compute_entropy(rvs.average_volume))
 
-    print('reference volume layer entropy: ',rvs.compute_entropy(vols[refidx],bright_layer=True))
+    print('reference volume layer entropy: ',rvs.compute_entropy(ref,bright_layer=True))
     print('unregistered average layer entropy: ',rvs.compute_entropy(np.mean(np.array(vols),axis=0),bright_layer=True))
     print('registered average layer entropy: ',rvs.compute_entropy(rvs.average_volume,bright_layer=True))
 
-    print('reference volume sharpness: ',rvs.compute_sharpness(vols[refidx]))
+    print('reference volume sharpness: ',rvs.compute_sharpness(ref))
     print('unregistered average sharpness: ',rvs.compute_sharpness(np.mean(np.array(vols),axis=0)))
     print('registered average sharpness: ',rvs.compute_sharpness(rvs.average_volume))
 
-    print('reference volume layer sharpness: ',rvs.compute_sharpness(vols[refidx],True))
+    print('reference volume layer sharpness: ',rvs.compute_sharpness(ref,True))
     print('unregistered average layer sharpness: ',rvs.compute_sharpness(np.mean(np.array(vols),axis=0),True))
     print('registered average layer sharpness: ',rvs.compute_sharpness(rvs.average_volume,True))
 
-    print('reference volume contrast: ',rvs.compute_contrast(vols[refidx]))
+    print('reference volume contrast: ',rvs.compute_contrast(ref))
     print('unregistered average contrast: ',rvs.compute_contrast(np.mean(np.array(vols),axis=0)))
     print('registered average contrast: ',rvs.compute_contrast(rvs.average_volume))
 
-    print('reference volume layer contrast: ',rvs.compute_contrast(vols[refidx],True))
+    print('reference volume layer contrast: ',rvs.compute_contrast(ref,True))
     print('unregistered average layer contrast: ',rvs.compute_contrast(np.mean(np.array(vols),axis=0),True))
     print('registered average layer contrast: ',rvs.compute_contrast(rvs.average_volume,True))
 
@@ -83,7 +66,7 @@ if PLOT_CORRELATIONS:
 
     pre_corrs = []
     for k in range(len(vols)):
-        pre_corrs.append(rvs.compute_correlation(vols[refidx],vols[k]))
+        pre_corrs.append(rvs.compute_correlation(ref,vols[k]))
 
     post_corrs = []
     for k in range(len(vols)):
@@ -96,19 +79,19 @@ if PLOT_CORRELATIONS:
     plt.ylabel('Pearson correlation with volume %d (OCT magnitude only)'%refidx)
     plt.legend()
     plt.xticks(range(0,20,5))
-    plt.savefig(os.path.join(output_folder,'volume_correlation.png'),dpi=300)
+    plt.savefig(os.path.join(manifest.output_folder,'volume_correlation.png'),dpi=300)
 
 
 if DO_PHASE_CORRECTION:
     # phase-align the volumes
     rvs.phase_align_volumes()
-    np.save(os.path.join(output_folder,'average_volume_phase_corrected.npy'),rvs.average_volume)
+    np.save(os.path.join(manifest.output_folder,'average_volume_phase_corrected.npy'),rvs.average_volume)
 
 if PLOT_PROJECTIONS:
     # visualize the result somehow:
     rad = 1
     aavg = np.abs(rvs.average_volume)
-    aref = np.abs(vols[refidx])
+    aref = np.abs(ref)
     yidx = np.nanargmax(np.nanmean(aavg,(1,2)))
     zidx = np.nanargmax(np.nanmean(aavg,(0,2)))
     xidx = np.nanargmax(np.nanmean(aavg,(0,1)))
@@ -134,7 +117,7 @@ if WRITE_PNGS:
     temp = np.abs(temp)
     temp[np.where(np.isnan(temp))] = np.nanmin(temp)
     temp = np.round((temp-np.min(temp))/(np.max(temp)-np.min(temp))*255).astype(np.uint8)
-    png_folder = os.path.join(output_folder,'average_volume_png')
+    png_folder = os.path.join(manifest.output_folder,'average_volume_png')
     os.makedirs(png_folder,exist_ok=True)
     plt.figure(figsize=(6,6))
     
@@ -150,7 +133,7 @@ if WRITE_PNGS:
 
 if WRITE_REGISTERED_VOLUMES:
     # save the corrected volumes:
-    registered_folder = os.path.join(output_folder,'registered_volumes')
+    registered_folder = os.path.join(manifest.output_folder,'registered_volumes')
     os.makedirs(registered_folder,exist_ok=True)
 
     for idx,vol in enumerate(rvs.corrected_volumes):

@@ -1,25 +1,18 @@
-import glob, os, sys
-from pathlib import Path
+import glob, os
 
-output_folder = '/home/rjonnal/Dropbox/Data/volume_registration/temp/output'
+output_folder = '/home/rjonnal/Dropbox/Data/volume_registration/07242026_output'
 
-volume_terms = ['/home/rjonnal/Dropbox/Data/volume_registration/temp/07242026_RJ_OD_t1b_acq5/tacq5_bscans/*',
-                '/home/rjonnal/Dropbox/Data/volume_registration/temp/07242026_RJ_OD_t3r_acq8/tacq8_bscans/*']
+volume_terms = ['/home/rjonnal/Dropbox/Data/volume_registration/07242026_RJ_OD_t1b_acq5/tacq5_bscans/*',
+                '/home/rjonnal/Dropbox/Data/volume_registration/07242026_RJ_OD_t3r_acq8/tacq8_bscans/*']
 
-volume_folders = []
+target_volume_filenames = []
 
 for vt in volume_terms:
-    volume_folders = volume_folders + glob.glob(vt)
+    target_volume_filenames = target_volume_filenames + sorted(glob.glob(vt))
 
-volume_folders = sorted(volume_folders)
-reference_folder = volume_folders[0]
+target_volume_filenames = sorted(target_volume_filenames)
+reference_volume_filename = target_volume_filenames[0]
 
-
-tags = []
-for vf in volume_folders:
-
-    path_obj = Path(vf)
-    path_list = list(path_obj.parts)
-    tags.append('_'.join(path_list[-3:]))
+target_volume_filenames = target_volume_filenames[31:]
 
 
