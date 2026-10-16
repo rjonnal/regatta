@@ -5,7 +5,7 @@ from matplotlib import pyplot as plt
 import sys,os,glob
 from pathlib import Path
 import scipy.ndimage as spn
-
+import scipy.interpolate as spi
 PLOT_SINGLE_VOLUME_RESULTS = False
 ALL_CORRS_HISTOGRAM = True
 
@@ -83,12 +83,8 @@ class RegisteredVolumeSeries:
 
     def make_tag(self,filename,n_terms=2):
         path = Path(filename)
-
-        # Get path components as a list
         path_list = list(path.parts)
         return '_'.join(path_list[-n_terms:])
-
-
         
     def add(self,volume_filename,x,y,z,xc):
 
@@ -143,7 +139,108 @@ class RegisteredVolumeSeries:
 
             rad_medfilt = spn.median_filter(rad_arr,size=13,mode='nearest')
 
-            medfilt_subtracted = rad_arr-rad_medfilt
+            medfilt_subtracted = np.abs(rad_arr-rad_medfilt)
+            threshold = 1
+            valid = np.where(medfilt_subtracted<=threshold)
+            invalid = np.where(medfilt_subtracted>threshold)
+            spline_k = 3
+            
+            t = np.arange(len(corr_arr))
+            plt.figure()
+            plt.subplot(2,2,1)
+            plt.plot(t[valid],x_shift_arr[valid],'go')
+            plt.plot(t[invalid],x_shift_arr[invalid],'ro')
+            plt.subplot(2,2,2)
+            plt.plot(t[valid],y_shift_arr[valid],'go')
+            plt.plot(t[invalid],y_shift_arr[invalid],'ro')
+            plt.subplot(2,2,3)
+            plt.plot(t[valid],z_shift_arr[valid],'go')
+            plt.plot(t[invalid],z_shift_arr[invalid],'ro')
+            plt.subplot(2,2,4)
+            plt.plot(t[valid],medfilt_subtracted[valid],'go')
+            plt.plot(t[invalid],medfilt_subtracted[invalid],'ro')
+            
+            # 2. Fit a cubic B-Spline (k=3) for each axis relative to time 't'
+            spline_x = spi.make_interp_spline(t[valid], x_shift_arr[valid], k=spline_k)
+            spline_y = spi.make_interp_spline(t[valid], y_shift_arr[valid], k=spline_k)
+            spline_z = spi.make_interp_spline(t[valid], z_shift_arr[valid], k=spline_k)
+
+            # 3. Evaluate the smooth path on a denser time grid
+            x_smooth = spline_x(t)
+            y_smooth = spline_y(t)
+            z_smooth = spline_z(t)
+
+            # 4. Plot the results in 3D
+            fig = plt.figure(figsize=(10, 7))
+            ax = fig.add_subplot(projection='3d')
+            ax.scatter(x_shift_arr[invalid], y_shift_arr[invalid], z_shift_arr[invalid], color='red', label='invalid')
+            ax.scatter(x_shift_arr[valid], y_shift_arr[valid], z_shift_arr[valid], color='green', label='valid')
+            ax.plot(x_smooth, y_smooth, z_smooth, color='blue', label='fitted spline')
+            ax.set_xlabel('x'); ax.set_ylabel('y'); ax.set_zlabel('z')
+            ax.legend()
+
+
+            plt.figure()
+            plt.subplot(2,2,1)
+            plt.plot(t[invalid],x_shift_arr[invalid],'ro',alpha=0.25)
+            plt.plot(t[valid],x_shift_arr[valid],'go',alpha=0.25)
+            plt.plot(t,x_smooth,'k-')
+            plt.subplot(2,2,2)
+            plt.plot(t[invalid],y_shift_arr[invalid],'ro',alpha=0.25)
+            plt.plot(t[valid],y_shift_arr[valid],'go',alpha=0.25)
+            plt.plot(t,y_smooth,'k-')
+            plt.subplot(2,2,3)
+            plt.plot(t[invalid],z_shift_arr[invalid],'ro',alpha=0.25)
+            plt.plot(t[valid],z_shift_arr[valid],'go',alpha=0.25)
+            plt.plot(t,z_smooth,'k-')
+            plt.subplot(2,2,4)
+            plt.plot(t[valid],medfilt_subtracted[valid],'go')
+            plt.plot(t[invalid],medfilt_subtracted[invalid],'ro')
+
+            
+            plt.show()
+            sys.exit()
+
+            # # 1. Generate some dummy noisy 3D trajectory data
+            # np.random.seed(42)
+            # t = np.linspace(0, 10, num=20)  # Time steps
+            # x = 2 * np.sin(t) + np.random.normal(0, 0.1, size=20)
+            # y = 2 * np.cos(t) + np.random.normal(0, 0.1, size=20)
+            # z = t * 0.5 + np.random.normal(0, 0.1, size=20)
+            # points = np.column_stack((x, y, z))
+
+            # # 2. Fit a cubic B-Spline (k=3) for each axis relative to time 't'
+            # spline_x = spi.make_interp_spline(t, x, k=3)
+            # spline_y = spi.make_interp_spline(t, y, k=3)
+            # spline_z = spi.make_interp_spline(t, z, k=3)
+
+            # # 3. Evaluate the smooth path on a denser time grid
+            # t_smooth = np.linspace(0, 10, num=200)
+            # x_smooth = spline_x(t_smooth)
+            # y_smooth = spline_y(t_smooth)
+            # z_smooth = spline_z(t_smooth)
+
+            # # 4. Plot the results in 3D
+            # fig = plt.figure(figsize=(10, 7))
+            # ax = fig.add_subplot(projection='3d')
+            # ax.scatter(x, y, z, color='red', label='Noisy Mocap/GPS Data')
+            # ax.plot(x_smooth, y_smooth, z_smooth, color='blue', label='Fitted 3D Spline Path')
+            # ax.set_xlabel('X'); ax.set_ylabel('Y'); ax.set_zlabel('Z')
+            # ax.legend()
+
+            plt.show()
+
+            sys.exit()
+            
+            # identify good segments of the derivative
+            threshold = 3
+            mask = np.ones(medfilt_subtracted_diff.shape)
+            mask[np.where(medfilt_subtracted_diff>=threshold)] = 0
+            mask = np.array([mask[0]]+list(mask))
+            plt.plot(medfilt_subtracted)
+            plt.plot(mask*10)
+            plt.show()
+            sys.exit()
             
             plt.subplot(3,2,1)
             plt.plot(x_shift_arr)
