@@ -155,21 +155,36 @@ class RegisteredVolumeSeries:
             # 4. Eye movement processes are reversible; that is "previous" in #3 is
             #    equivalent to "next".
 
+            # convert our accummulation lists into arrays:
             corr_arr = np.array(corr_arr)
             y_shift_arr = np.array(y_shift_arr,dtype=float)
             z_shift_arr = np.array(z_shift_arr,dtype=float)
             x_shift_arr = np.array(x_shift_arr,dtype=float)
+
+            t = np.arange(len(corr_arr))
+            
+            
+            # compute Euclidean displacement array from x, y, z
             rad_arr = np.sqrt(y_shift_arr**2+z_shift_arr**2+x_shift_arr**2)
 
+            # compute a median-filtered version of rad_arr
             rad_medfilt = spn.median_filter(rad_arr,size=13,mode='nearest')
 
+            # subtract the median-filtered version from the original rad_arr
             medfilt_subtracted = np.abs(rad_arr-rad_medfilt)
-            threshold = 1
+
+
+            plt.figure()
+            plt.subplot(1,3,1)
+            plt.plot(t,rad_arr)
+            plt.subplot(1,3,2)
+            plt.plot(t,rad_medfilt)
+            plt.subplot(1,3,3)
+            plt.plot(t,medfilt_subtracted)
+
+            threshold = 5
             valid = np.where(medfilt_subtracted<=threshold)
             invalid = np.where(medfilt_subtracted>threshold)
-            spline_k = 3
-            
-            t = np.arange(len(corr_arr))
             plt.figure()
             plt.subplot(2,2,1)
             plt.plot(t[valid],x_shift_arr[valid],'go')
@@ -183,8 +198,10 @@ class RegisteredVolumeSeries:
             plt.subplot(2,2,4)
             plt.plot(t[valid],medfilt_subtracted[valid],'go')
             plt.plot(t[invalid],medfilt_subtracted[invalid],'ro')
+            plt.show()
             
             # 2. Fit a cubic B-Spline (k=3) for each axis relative to time 't'
+            spline_k = 1
             spline_x = spi.make_interp_spline(t[valid], x_shift_arr[valid], k=spline_k)
             spline_y = spi.make_interp_spline(t[valid], y_shift_arr[valid], k=spline_k)
             spline_z = spi.make_interp_spline(t[valid], z_shift_arr[valid], k=spline_k)
@@ -202,7 +219,7 @@ class RegisteredVolumeSeries:
             ax.plot(x_smooth, y_smooth, z_smooth, color='blue', label='fitted spline')
             ax.set_xlabel('x'); ax.set_ylabel('y'); ax.set_zlabel('z')
             ax.legend()
-
+            plt.show()
 
             plt.figure()
             plt.subplot(2,2,1)
