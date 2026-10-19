@@ -94,6 +94,30 @@ class RegisteredVolumeSeries:
         self.zshifts.append(z)
         self.corrs.append(xc)
 
+    def register_volumes_simple(self,show_plots=False):
+        target_volume_filenames = self.target_volume_filenames
+        all_corrs = []
+        for vidx,target_volume_filename in enumerate(target_volume_filenames):
+            target_volume = rfunc.get_volume(target_volume_filename)
+            corr_arr = []
+            y_shift_arr = []
+            z_shift_arr = []
+            x_shift_arr = []
+            for s in range(self.ref.n_slow):
+                print('Registering B-scan %03d of %03d in volume %03d of %03d.'%(s,self.ref.n_slow,vidx,len(target_volume_filenames)))
+                tar = target_volume[s,:,:]
+                res = self.ref.register(tar)
+                corr_arr.append(res['xc'])
+                all_corrs.append(res['xc'])
+                x_shift_arr.append(res['dx'])
+                y_shift_arr.append(res['dy']-s)
+                z_shift_arr.append(res['dz'])
+
+            self.add(target_volume_filename,
+                     x_shift_arr_valid,
+                     y_shift_arr_valid,
+                     z_shift_arr_valid,
+                     corr_arr_valid)
 
     def register_volumes(self,show_plots=False):
         target_volume_filenames = self.target_volume_filenames
@@ -320,7 +344,7 @@ class RegisteredVolumeSeries:
                      y_shift_arr_valid,
                      z_shift_arr_valid,
                      corr_arr_valid)
-
+            
     def correct_volumes(self):
         # Determine how large the rendered volume must be.
         # 1. Convert shifts lists to arrays

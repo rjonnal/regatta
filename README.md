@@ -2,19 +2,23 @@
 
 RegATTA is a tool for registration of raster-scanned OCT images.
 
-This is an initial release. The minimum working example can be found in `/examples/register_volumes.py`. Sample AO-OCT data for running the script may be found [here](https://www.dropbox.com/scl/fo/ys0tmdk79i6tvkbz28ktp/ALx_5UovCD0_5O_yz5HGTHw?rlkey=h1g2u6ocv9i00g1o7k9s5lngh&dl=0).
+### Overview
 
-The data root folder and output folder must be specified at the top of the script.
+Expected data include a **reference** volume and a series of **target** volumes that may include the reference volume. Steps include:
 
-Minimally, the script will generate a registered average volume and save it to the output folder.  Several boolean switches are found at the top of the script, that control other outputs:
+1. Selection of a reference volume by the user. Later versions may include tools for automatic or assisted selection of a reference volume.
 
-```python
-COMPUTE_FIGURES_OF_MERIT = False
-DO_PHASE_CORRECTION = False
-PLOT_CORRELATIONS = False
-PLOT_PROJECTIONS = False
-WRITE_PNGS = False
-WRITE_REGISTERED_VOLUMES = False
-```
+2. Specification of the target volumes. Now, these must consist of folders full of B-scans, with each B-scan stored in a separate `.npy` file. The B-scan filenames must correspond to the order in which the B-scans were acquired (i.e., along the slow-scanner axis).
 
-Please see the scripts in `/tests` for additional testing scripts.
+3. The first step in registration is looping through the target volumes. For each target volume, we loop through the B-scans and register each to the reference volume. This produces x, y, and z coordinates for each B-scan. This is a time-consuming step, and these values are cached for subsequent runs of the registration script.
+
+### Manifest
+
+The manifest contains the registration "recipe". It should be called `manifest.py`. It must contain the following definitions:
+
+1. `target_volume_filenames`: a list (or other iterable) containing the specifiers of the target volumes. These may be folders containing ordered B-scans, or `.npy` files storing entire volumes.
+
+2. `reference_volume_filename`: a specifier for the reference volume, which may be a folder containing B-scans or an `.npy` filename.
+
+3. `output_folder`: where to store intermediate files, corrected volumes, a registered average, etc.
+
