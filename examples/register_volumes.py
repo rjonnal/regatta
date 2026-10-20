@@ -19,14 +19,15 @@ WRITE_REGISTERED_VOLUMES = False
 ############## END USER PARAMETERS ##############
 
 
-os.makedirs(manifest.output_folder,exist_ok=True)
-
-# get the reference volume
-ref = rfunc.get_volume(manifest.reference_volume_filename)
-
 # register the series to the reference:
-rvs = registered_volume_series.RegisteredVolumeSeries(ref,manifest)
-rvs.register_volumes(show_plots=False)
+rvs = registered_volume_series.RegisteredVolumeSeries(manifest)
+rvs.compute_cross_correlations(show_plots=True)
+# Use specific_index to work on a particular trajectory; useful
+# for skipping the first volume in case it was the reference volume.
+# This argument is really only useful for debugging and algorithm development.
+rvs.compute_trajectories(show_plots=True,specific_index=3)
+
+
 rvs.correct_volumes()
 sys.exit()
 

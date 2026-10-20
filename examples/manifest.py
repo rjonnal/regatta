@@ -10,9 +10,7 @@ target_volume_filenames = []
 for vt in volume_terms:
     target_volume_filenames = target_volume_filenames + sorted(glob.glob(vt))
 
-target_volume_filenames = sorted(target_volume_filenames)
+target_volume_filenames = sorted(target_volume_filenames)[:5]
 reference_volume_filename = target_volume_filenames[0]
-
-target_volume_filenames = target_volume_filenames[10:]
 
 
